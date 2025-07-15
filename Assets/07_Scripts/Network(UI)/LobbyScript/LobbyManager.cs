@@ -4,11 +4,6 @@ using System.Collections;
 using UnityEngine;
 using Photon.Pun;
 using Photon.Realtime;
-using System.Threading.Tasks;
-using System.Linq;
-using System.Threading;
-using Photon.Pun.Demo.PunBasics;
-using UnityEngine.TextCore.Text;
 
 
 public class LobbyManager : MonoBehaviourPunCallbacks
@@ -22,9 +17,7 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     [HideInInspector] public TestCHMKart kartCtrl;
     public GameObject kartPrefab;
     private CharacterSo[] _characterSoArray;
-
     public CharacterSo characterSo;
-    private CharacterSo _selectedChar;
     private void Awake()
     {        
         _characterSoArray = Resources.LoadAll<CharacterSo>("Character");
@@ -46,6 +39,7 @@ public class LobbyManager : MonoBehaviourPunCallbacks
                 pool.ResourceCache.Add(soCharacter.characterName, soCharacter.characterPrefab);
             }
         }
+        StartCoroutine(KartandCharacterCor());
     }
 
     /// <summary>
@@ -251,31 +245,40 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     /// </summary>
     public override void OnJoinedLobby()
     {
-        InstantiateKartandCharacter();
         roomListUpdateCor = StartCoroutine(RoomListUpdateCor());        
     }
-    public void InstantiateKartandCharacter()
+    IEnumerator KartandCharacterCor()
     {
         GameObject kart = Instantiate(kartPrefab, Vector3.zero, Quaternion.Euler(0, 140, 0));
-        if (SceneCont.Instance != null)
+
+        if (!string.IsNullOrEmpty("SelectedCharacter"))
         {
-            if(SceneCont.Instance.SelectedCharacter != null)
+            string characterName = "";
+            var characterTask = FirebaseDBManager.Instance.DbRef.Child("users")
+            .Child(FirebaseDBManager.Instance.User.UserId)
+            .Child("SelectedCharacter")
+            .GetValueAsync();
+            yield return new WaitUntil(() => characterTask.IsCompleted);
+            if (characterTask.Exception != null)
             {
-                _selectedChar = SceneCont.Instance.SelectedCharacter;
-                characterSo = _selectedChar;
+                characterName = "Bazzi";
             }
             else
             {
-                characterSo = _characterSoArray[1];
+                characterName = characterTask.Result.Value.ToString();                
+            }
+            foreach (var character in _characterSoArray)
+            {
+                if (characterName == character.characterName)
+                {
+                    characterSo = character;
+                    break;
+                }
             }
         }
-        foreach(var character in _characterSoArray)
+        else
         {
-            if (characterSo.characterName == character.characterName)
-            {
-                characterSo = character;
-                break;
-            }
+            characterSo = _characterSoArray[1];
         }
         if (characterSo.characterName == "Airi" || characterSo.characterName == "Lena")
         {

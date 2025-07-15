@@ -135,6 +135,27 @@ public class AuthManager : MonoBehaviour
             titleUI.ToggleCreateNickNamePanel(true);
         }
         yield return new WaitUntil(predicate: () => !string.IsNullOrEmpty(user.DisplayName));
+
+        if (string.IsNullOrEmpty("CharacterList"))
+        {
+            //리소스폴더에 있는 캐릭터들의 이름을 파이어베이스의 데이터 베이스에 저장함
+            List<CharacterSo> characters = Resources.LoadAll<CharacterSo>("Character").ToList();
+            List<string> jsonList = characters.Select(p => p.characterName).ToList();
+
+            var saveTask = FirebaseDBManager.Instance.DbRef.Child("users")
+                .Child(FirebaseDBManager.Instance.User.UserId)
+                .Child("CharacterList")
+                .SetValueAsync(jsonList);
+            yield return new WaitUntil(() => saveTask.IsCompleted);
+            if (!saveTask.IsCompleted)
+            {
+                titleUI.ShowMessage(titleUI.errorMessage, "초기 캐릭터 리스트 저장 실패!관리자에게 문의하세요.", true);
+                yield return new WaitForSeconds(2);
+                yield break;
+            }
+            Debug.Log("초기 캐릭터 셋팅 완료");
+        }
+
         titleUI.ToggleCreateNickNamePanel(false);//닉네임이 있다면 통과
         titleUI.ShowMessage(titleUI.successMessage, "로그인 성공!", true);
         titleUI.SetLogInButtonsInteractable(true);
@@ -167,8 +188,7 @@ public class AuthManager : MonoBehaviour
             }
         }
         SceneCont.Instance.Oper.allowSceneActivation = true;
-    }
-
+    }    
     public void CreateNickNameBottenCon()
     {
         //닉네임 생성 버튼 클릭 시 닉네임 중복 검사 코루틴
@@ -366,21 +386,21 @@ public class AuthManager : MonoBehaviour
         }
 
         //리소스폴더에 있는 캐릭터들의 이름을 파이어베이스의 데이터 베이스에 저장함
-        //List<CharacterSo> characters = Resources.LoadAll<CharacterSo>("Character").ToList();
-        //List<string> jsonList = characters.Select(p => p.characterName).ToList();
-                
-        //var saveTask = FirebaseDBManager.Instance.DbRef.Child("users")
-        //    .Child(FirebaseDBManager.Instance.User.UserId)
-        //    .Child("CharacterList")
-        //    .SetValueAsync(jsonList);
-        //yield return new WaitUntil(() => saveTask.IsCompleted);
-        //if (!saveTask.IsCompleted)
-        //{            
-        //    titleUI.ShowMessage(titleUI.errorMessage, "초기 캐릭터 리스트 저장 실패!관리자에게 문의하세요.", true);
-        //    yield return new WaitForSeconds(2);
-        //    yield break;
-        //}
-        //Debug.Log("초기 캐릭터 셋팅 완료");
+        List<CharacterSo> characters = Resources.LoadAll<CharacterSo>("Character").ToList();
+        List<string> jsonList = characters.Select(p => p.characterName).ToList();
+
+        var saveTask = FirebaseDBManager.Instance.DbRef.Child("users")
+            .Child(FirebaseDBManager.Instance.User.UserId)
+            .Child("CharacterList")
+            .SetValueAsync(jsonList);
+        yield return new WaitUntil(() => saveTask.IsCompleted);
+        if (!saveTask.IsCompleted)
+        {
+            titleUI.ShowMessage(titleUI.errorMessage, "초기 캐릭터 리스트 저장 실패!관리자에게 문의하세요.", true);
+            yield return new WaitForSeconds(2);
+            yield break;
+        }
+        Debug.Log("초기 캐릭터 셋팅 완료");
 
         titleUI.ToggleSignUpPanel(false);
         //회원가입 완료 메세지
@@ -390,5 +410,5 @@ public class AuthManager : MonoBehaviour
         titleUI.HideMessages(); //메세지 가리고
                                 //텍스트 초기화 하고        
         titleUI.LoginToButtonCon(); //회원가입 완료 후 로그인 화면으로 이동
-    }
+    }    
 }

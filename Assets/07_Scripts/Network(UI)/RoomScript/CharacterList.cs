@@ -8,53 +8,98 @@ public class CharacterList : MonoBehaviour
     public CharacterSo[] characters;
     public GameObject kartPrefab;
     public RawImage characterImage;
-    
+    public CharacterSo characterSo;
     public List<GameObject> characterListPrefab;
-    public int currentIndex = 0;
+    private string characterName;
+    private int Index = 0;
     private void Awake()
     {
         characters = Resources.LoadAll<CharacterSo>("Character");
         characterListPrefab = new List<GameObject>();
-
+                
         SetCharacterResources();
-        
     }
 
     public void SetCharacterResources()
     {
-        //GameObject kart = PhotonNetwork.Instantiate(kartPrefab.name, Vector3.zero, Quaternion.identity);
-        // kart에 붙어 있는 Controller 가져오기
-        //testCHMKart = kart.GetComponent<TestCHMKart>();
-
         foreach (var character in characters)
         {
-            var characterObj = Instantiate(character.characterPrefab, Vector3.zero, Quaternion.Euler(-90, -90, 0));
-            characterObj.gameObject.SetActive(false);
-            characterListPrefab.Add(characterObj);            
+            if (character.characterName == "Airi" || character.characterName == "Lena")
+            {
+                GameObject playerChar = Instantiate(character.characterPrefab, Vector3.zero, Quaternion.Euler(-90, 0, -90));
+                characterListPrefab.Add(playerChar);
+                playerChar.gameObject.SetActive(false);
+            }
+            else if (character.characterName == "Bazzi" || character.characterName == "Dao" || character.characterName == "Kephi")
+            {
+                GameObject playerChar = Instantiate(character.characterPrefab, Vector3.zero, Quaternion.Euler(0, 0, 0));
+                characterListPrefab.Add(playerChar);
+                playerChar.gameObject.SetActive(false);
+            }
         }
-        characterListPrefab[currentIndex].gameObject.SetActive(true);
+        StartCoroutine(KartandCharacterCor());
     }
 
     public void CharacterChangeNextBtn()
     {
-        characterListPrefab[currentIndex].gameObject.SetActive(false);
-        currentIndex = (currentIndex + 1) % characterListPrefab.Count;
-        characterListPrefab[currentIndex].gameObject.SetActive(true);
+        characterListPrefab[Index].gameObject.SetActive(false);
+        Index = (Index + 1) % characterListPrefab.Count;
+        characterListPrefab[Index].gameObject.SetActive(true);
     }
     public void PreviousCharacterBtn()
     {
-        characterListPrefab[currentIndex].gameObject.SetActive(false);
-        currentIndex = (currentIndex - 1 + characterListPrefab.Count) % characterListPrefab.Count;
-        characterListPrefab[currentIndex].gameObject.SetActive(true);
+        characterListPrefab[Index].gameObject.SetActive(false);
+        Index = (Index - 1 + characterListPrefab.Count) % characterListPrefab.Count;
+        characterListPrefab[Index].gameObject.SetActive(true);
     }
     public CharacterSo SelectedCharacter()
     {
         if (SceneCont.Instance != null)
         {
-            SceneCont.Instance.SelectedCharacter = characters[currentIndex];
+            SceneCont.Instance.SelectedCharacter = characters[Index];
+            var saveTask = FirebaseDBManager.Instance.DbRef.Child("users")
+                .Child(FirebaseDBManager.Instance.User.UserId)
+                .Child("SelectedCharacter")
+                .SetValueAsync(characters[Index].characterName);
         }
-        Debug.Log(characterListPrefab[currentIndex].gameObject.name + "선택한 오브젝트 이름");
-        return characters[currentIndex];
+        return characters[Index];
     }
-
+    IEnumerator KartandCharacterCor()
+    {
+        if (!string.IsNullOrEmpty("SelectedCharacter"))
+        {            
+            var characterTask = FirebaseDBManager.Instance.DbRef.Child("users")
+            .Child(FirebaseDBManager.Instance.User.UserId)
+            .Child("SelectedCharacter")
+            .GetValueAsync();
+            yield return new WaitUntil(() => characterTask.IsCompleted);
+            if (characterTask.Exception != null)
+            {
+                Index = 1;
+                characterName = "Bazzi";
+            }
+            else
+            {
+                characterName = characterTask.Result.Value.ToString();
+                GetPlayerSelectedCharacter();
+            }
+        }
+        else
+        {
+            Index = 1;
+            characterListPrefab[Index].gameObject.SetActive(true);
+        }
+    }
+    private void GetPlayerSelectedCharacter()
+    {
+        foreach (var character in characters)
+        {
+            if (characterName == character.characterName)
+            {
+                characterListPrefab[Index].gameObject.SetActive(true);
+                break;
+            }
+            Index++;
+        }
+    }
 }
