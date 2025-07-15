@@ -7,6 +7,8 @@ using Photon.Realtime;
 using System.Threading.Tasks;
 using System.Linq;
 using System.Threading;
+using Photon.Pun.Demo.PunBasics;
+using UnityEngine.TextCore.Text;
 
 
 public class LobbyManager : MonoBehaviourPunCallbacks
@@ -17,6 +19,35 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     private Queue<string> availableRoomNumbers = new Queue<string>(); // 방 번호 관리 Queue
     private HashSet<string> usedRoomNumbers = new HashSet<string>(); // 사용 중인 방 번호 추적
     private Coroutine roomListUpdateCor;
+    [HideInInspector] public TestCHMKart kartCtrl;
+    public GameObject kartPrefab;
+    private CharacterSo[] _characterSoArray;
+
+    public CharacterSo characterSo;
+    private CharacterSo _selectedChar;
+    private void Awake()
+    {        
+        _characterSoArray = Resources.LoadAll<CharacterSo>("Character");
+
+        DefaultPool pool = PhotonNetwork.PrefabPool as DefaultPool;
+        if (pool != null)
+        {
+            if (!pool.ResourceCache.ContainsKey(kartPrefab.name))
+            {
+                pool.ResourceCache.Add(kartPrefab.name, kartPrefab);
+            }
+
+            foreach (var soCharacter in _characterSoArray)
+            {
+                if (pool.ResourceCache.ContainsKey(soCharacter.characterName))
+                {
+                    continue;
+                }
+                pool.ResourceCache.Add(soCharacter.characterName, soCharacter.characterPrefab);
+            }
+        }
+    }
+
     /// <summary>
     /// 스타트를 코루틴으로 하여 연결수립을 대기
     /// 타이틀 씬에서 넘어오면서 씬 변경에 대한 안정성을 보장 받기 위한 작업
@@ -220,9 +251,41 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     /// </summary>
     public override void OnJoinedLobby()
     {
-        roomListUpdateCor = StartCoroutine(RoomListUpdateCor());
+        InstantiateKartandCharacter();
+        roomListUpdateCor = StartCoroutine(RoomListUpdateCor());        
     }
-
+    public void InstantiateKartandCharacter()
+    {
+        GameObject kart = Instantiate(kartPrefab, Vector3.zero, Quaternion.Euler(0, 140, 0));
+        if (SceneCont.Instance != null)
+        {
+            if(SceneCont.Instance.SelectedCharacter != null)
+            {
+                _selectedChar = SceneCont.Instance.SelectedCharacter;
+                characterSo = _selectedChar;
+            }
+            else
+            {
+                characterSo = _characterSoArray[1];
+            }
+        }
+        foreach(var character in _characterSoArray)
+        {
+            if (characterSo.characterName == character.characterName)
+            {
+                characterSo = character;
+                break;
+            }
+        }
+        if (characterSo.characterName == "Airi" || characterSo.characterName == "Lena")
+        {
+            GameObject playerChar = Instantiate(characterSo.characterPrefab, Vector3.zero, Quaternion.Euler(-90, -30, -90));
+        }
+        else if (characterSo.characterName == "Bazzi" || characterSo.characterName == "Dao" || characterSo.characterName == "Kephi")
+        {
+            GameObject playerChar = Instantiate(characterSo.characterPrefab, Vector3.zero, Quaternion.Euler(0, -30, 0));
+        }
+    }
     /// <summary>
     /// 로비에서 나갈 때 룸리스트 업데이트 코루틴 멈추기
     /// 룸 이동시 어차피 씬 전환으로 인해 파괴가 될 것이지만.... 흠

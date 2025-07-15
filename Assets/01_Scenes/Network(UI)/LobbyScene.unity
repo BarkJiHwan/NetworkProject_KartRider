@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.18028301, g: 0.22571309, b: 0.30692127, a: 1}
+  m_IndirectSpecularColor: {r: 0.18028352, g: 0.22571376, b: 0.30692244, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -2929,6 +2929,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   lobbyUiMgr: {fileID: 1383841038}
+  kartCtrl: {fileID: 0}
+  kartPrefab: {fileID: 6750277665416376479, guid: 3307d1a16d18ebb47a4bfe1b899abfb1, type: 3}
 --- !u!4 &583882397
 Transform:
   m_ObjectHideFlags: 0
@@ -7791,7 +7793,6 @@ GameObject:
   m_Component:
   - component: {fileID: 2126792398}
   - component: {fileID: 2126792397}
-  - component: {fileID: 2126792396}
   - component: {fileID: 2126792395}
   m_Layer: 0
   m_Name: Camera
@@ -7844,14 +7845,6 @@ MonoBehaviour:
     mipBias: 0
     varianceClampScale: 0.9
     contrastAdaptiveSharpening: 0
---- !u!81 &2126792396
-AudioListener:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2126792394}
-  m_Enabled: 1
 --- !u!20 &2126792397
 Camera:
   m_ObjectHideFlags: 0
