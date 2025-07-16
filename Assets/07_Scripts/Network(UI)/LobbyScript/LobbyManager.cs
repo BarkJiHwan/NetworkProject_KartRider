@@ -252,27 +252,26 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         GameObject kart = Instantiate(kartPrefab, Vector3.zero, Quaternion.Euler(0, 140, 0));
 
         if (!string.IsNullOrEmpty("SelectedCharacter"))
-        {
-            string characterName = "";
+        {            
+            string characterName = "Bazzi";
             var characterTask = FirebaseDBManager.Instance.DbRef.Child("users")
             .Child(FirebaseDBManager.Instance.User.UserId)
             .Child("SelectedCharacter")
-            .GetValueAsync();
+            .SetValueAsync(characterName);
             yield return new WaitUntil(() => characterTask.IsCompleted);
             if (characterTask.Exception != null)
             {
-                characterName = "Bazzi";
+                characterSo = _characterSoArray[1];
             }
             else
             {
-                characterName = characterTask.Result.Value.ToString();                
-            }
-            foreach (var character in _characterSoArray)
-            {
-                if (characterName == character.characterName)
+                foreach (var character in _characterSoArray)
                 {
-                    characterSo = character;
-                    break;
+                    if (characterName == character.characterName)
+                    {
+                        characterSo = character;
+                        break;
+                    }
                 }
             }
         }

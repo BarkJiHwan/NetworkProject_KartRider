@@ -6,6 +6,7 @@ using Firebase.Auth;
 using Firebase.Database;
 using System;
 using System.Linq;
+using UnityEditor.VersionControl;
 
 public class AuthManager : MonoBehaviour
 {
@@ -47,17 +48,19 @@ public class AuthManager : MonoBehaviour
     {
         // Firebase 인증을 통해 이메일과 비밀번호 로그인 요청 처리
         var loginTask = FirebaseDBManager.Instance.Auth.SignInWithEmailAndPasswordAsync(email, password);
-        
-        float timeout = 5f;
-        float elapsed = 0f;
 
-        
+        float timeout = 5f; // 타임아웃 시간
+        float elapsed = 0f; 
+        string message = ""; // 출력 메세지
+        bool toggle = true; // 출력 메세지 변환을 위한 토글
         while (!loginTask.IsCompleted && elapsed < timeout)
         {
-            yield return null; 
-            elapsed += Time.deltaTime; 
+            message = toggle ? "로그인중." : "로그인중..";
+            titleUI.ShowMessage(titleUI.successMessage, message, true);
+            toggle = !toggle;
+            yield return wait;
+            elapsed += 1f;
         }
-
         // 5초가 지나도 작업이 완료되지 않으면 타임아웃 처리
         if (!loginTask.IsCompleted)
         {
@@ -185,21 +188,21 @@ public class AuthManager : MonoBehaviour
             if (SceneCont.Instance.Oper.progress < 0.9f)
             {
                 titleUI.lodingBar.value = SceneCont.Instance.Oper.progress;
-                yield return new WaitUntil(predicate: () => serverCon.Connect());
-                if (!serverCon.Connect())
-                {
-                    //커넥트 오류시
-                    titleUI.ShowMessage(titleUI.errorMessage, "서버 접속 실패 다시 로그인해주세요.", true);
-                    yield return new WaitForSeconds(2f);
-                    titleUI.InitializeLogin();//다시 로그인 하는 것 처럼 타이틀 창 초기화
-                    yield break;
-                }
             }
             else
             {
                 //마스터 서버 접속 대기중
                 titleUI.lodingBar.value = 1f;
                 break;
+            }
+            yield return new WaitUntil(predicate: () => serverCon.Connect());
+            if (!serverCon.Connect())
+            {
+                //커넥트 오류시
+                titleUI.ShowMessage(titleUI.errorMessage, "서버 접속 실패 다시 로그인해주세요.", true);
+                yield return new WaitForSeconds(2f);
+                titleUI.InitializeLogin();//다시 로그인 하는 것 처럼 타이틀 창 초기화
+                yield break;
             }
         }
         SceneCont.Instance.Oper.allowSceneActivation = true;
@@ -236,14 +239,16 @@ public class AuthManager : MonoBehaviour
 
         float timeout = 5f;
         float elapsed = 0f;
-
-        
+        string message = "";
+        bool toggle = true;
         while (!nickNameCheckingTask.IsCompleted && elapsed < timeout)
         {
-            yield return null;
-            elapsed += Time.deltaTime;
+            message = toggle ? "닉네임 생성중." : "닉네임 생성중..";
+            titleUI.ShowMessage(titleUI.successMessage, message, true);
+            toggle = !toggle;
+            yield return wait;
+            elapsed += 1f;
         }
-
         if (!nickNameCheckingTask.IsCompleted)
         {
             titleUI.ShowMessage(titleUI.errorMessage, "네트워크 상태가 불안정합니다. 다시 시도해주세요.", true);
@@ -251,7 +256,6 @@ public class AuthManager : MonoBehaviour
         }
         if (nickNameCheckingTask.Exception != null)
         {//닉네임 유효성 검사 실패 메세지: 사용할 수 없는 닉네임입니다.
-            Debug.Log("중복닉네임검사 오류!");
             titleUI.ShowMessage(titleUI.errorMessage, "사용할 수 없는 닉네임입니다.", true);
             yield break;
         }
@@ -289,13 +293,14 @@ public class AuthManager : MonoBehaviour
 
         timeout = 5f;
         elapsed = 0f;
-
         while (!nickNameTask.IsCompleted && elapsed < timeout)
         {
-            yield return null;
-            elapsed += Time.deltaTime;
+            message = toggle ? "닉네임 생성중." : "닉네임 생성중..";
+            titleUI.ShowMessage(titleUI.successMessage, message, true);
+            toggle = !toggle;
+            yield return wait;
+            elapsed += 1f;
         }
-
         if (!nickNameTask.IsCompleted)
         {
             titleUI.ShowMessage(titleUI.errorMessage, "네트워크 상태가 불안정합니다. 다시 시도해주세요.", true);
@@ -304,11 +309,9 @@ public class AuthManager : MonoBehaviour
         if (nickNameTask.Exception != null)
         {
             //파이어베이스 닉네임 저장 실패 메세지: 사용할 수 없는 닉네임입니다
-            Debug.Log("파이어베이스 저장실패!");
             titleUI.errorMessage.text = "사용할 수 없는 닉네임입니다.";
             yield break;
         }
-
         Debug.Log("유저 정보 저장");
         FirebaseDBManager.Instance.User.UpdateUserProfileAsync(new UserProfile { DisplayName = nickName });
         titleUI.HideMessages();
@@ -339,23 +342,30 @@ public class AuthManager : MonoBehaviour
     /// <param name="email">이메일 필드로 받은 이메일 정보</param>
     /// <param name="password">패스워드 필드로 받은 패스워드 정보</param>
     IEnumerator SignUpCoroutine(string email, string password)
-    {        
+    {
+        titleUI.SetsignUpInteractable(false);// 버튼 비활성
         var signUpTask = FirebaseDBManager.Instance.Auth.CreateUserWithEmailAndPasswordAsync(email, password);
         float timeout = 5f;
         float elapsed = 0f;
-                
+        bool toggle = true;
+        string message = "";
         while (!signUpTask.IsCompleted && elapsed < timeout)
         {
-            yield return null;
-            elapsed += Time.deltaTime;
-        }                
+            message = toggle ? "계정 확인중." : "계정 확인중..";
+            titleUI.ShowMessage(titleUI.successMessage, message, true);
+            toggle = !toggle;
+            yield return wait;
+            elapsed += 1f;
+        }
         if (!signUpTask.IsCompleted)
         {
+            titleUI.SetsignUpInteractable(true);
             titleUI.ShowMessage(titleUI.errorMessage, "네트워크 상태가 불안정합니다. 다시 시도해주세요.", true);
             yield break;
         }
         if (signUpTask.Exception != null)
         {
+            titleUI.SetsignUpInteractable(true);
             SignUpError(signUpTask.Exception);
             yield break;
         }
@@ -413,29 +423,32 @@ public class AuthManager : MonoBehaviour
     /// 오류가 없다면 회원가입 완료
     /// </summary>
     IEnumerator FinishSignUp()
-    {        
+    {
         var setPrfileTask = FirebaseDBManager.Instance.DbRef.Child("users")
             .Child(FirebaseDBManager.Instance.User.UserId).Child("isLoggedIn")
             .SetValueAsync(false);
-        float timer = 5f;
-        float elapsedTime = 0;
+        float timeout = 2f;
+        float elapsed = 0f;
         bool toggle = true;
-        while (!setPrfileTask.IsCompleted)
-        {            
-            elapsedTime += 1f;
-            if (elapsedTime >= timer)
-            {
-                break;
-            }
-            string message = toggle ? "계정 생성중." : "계정 생성중..";
+        string message = "";
+        while (elapsed < timeout)
+        {
+            message = toggle ? "계정 생성중." : "계정 생성중..";
             titleUI.ShowMessage(titleUI.successMessage, message, true);
             toggle = !toggle;
             yield return wait;
+            elapsed += 1f;
         }
-        if(setPrfileTask.Exception != null)
+        if (!setPrfileTask.IsCompleted)
+        {
+            titleUI.ShowMessage(titleUI.errorMessage, "네트워크 상태가 불안정합니다. 다시 시도해주세요.", true);
+            yield return wait;
+            titleUI.InitializeLogin();
+        }
+        if (setPrfileTask.Exception != null)
         {
             titleUI.ShowMessage(titleUI.errorMessage, "유저 데이터 생성 실패 관리자에게 문의하세요.", true);
-            yield return new WaitForSeconds(2);
+            yield return wait;
             titleUI.InitializeLogin();
             yield break;
         }
@@ -448,11 +461,30 @@ public class AuthManager : MonoBehaviour
             .Child(FirebaseDBManager.Instance.User.UserId)
             .Child("CharacterList")
             .SetValueAsync(jsonList);
-        yield return new WaitUntil(() => saveTask.IsCompleted);
+        timeout = 5f;
+        elapsed = 0f;
+        toggle = true;
+        message = "";
+        while (!setPrfileTask.IsCompleted && elapsed < timeout)
+        {
+            message = toggle ? "캐릭터 정보 생성중." : "캐릭터 정보 생성중...";
+            titleUI.ShowMessage(titleUI.successMessage, message, true);
+            toggle = !toggle;
+            yield return wait;
+            elapsed += 1f;
+        }
         if (!saveTask.IsCompleted)
         {
-            titleUI.ShowMessage(titleUI.errorMessage, "초기 캐릭터 리스트 저장 실패!관리자에게 문의하세요.", true);
-            yield return new WaitForSeconds(2);
+            titleUI.ShowMessage(titleUI.errorMessage, "네트워크 상태가 불안정합니다. 다시 시도해주세요.", true);
+            yield return wait;
+            titleUI.InitializeLogin();
+            yield break;
+        }
+        if (saveTask.Exception != null)
+        {
+            titleUI.ShowMessage(titleUI.errorMessage, "캐릭터 데이터 생성 실패 관리자에게 문의하세요.", true);
+            yield return wait;
+            titleUI.InitializeLogin();
             yield break;
         }
         Debug.Log("초기 캐릭터 셋팅 완료");
