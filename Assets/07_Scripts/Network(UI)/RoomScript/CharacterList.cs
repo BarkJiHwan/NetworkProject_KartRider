@@ -67,7 +67,7 @@ public class CharacterList : MonoBehaviour
     IEnumerator KartandCharacterCor()
     {
         if (!string.IsNullOrEmpty("SelectedCharacter"))
-        {            
+        {
             var characterTask = FirebaseDBManager.Instance.DbRef.Child("users")
             .Child(FirebaseDBManager.Instance.User.UserId)
             .Child("SelectedCharacter")

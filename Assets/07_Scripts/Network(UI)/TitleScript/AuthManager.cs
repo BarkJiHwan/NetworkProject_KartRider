@@ -47,8 +47,23 @@ public class AuthManager : MonoBehaviour
     {
         // Firebase 인증을 통해 이메일과 비밀번호 로그인 요청 처리
         var loginTask = FirebaseDBManager.Instance.Auth.SignInWithEmailAndPasswordAsync(email, password);
-        // 로그인 요청이 완료될 때 까지 대기
-        yield return new WaitUntil(predicate: () => loginTask.IsCompleted);
+        
+        float timeout = 5f;
+        float elapsed = 0f;
+
+        
+        while (!loginTask.IsCompleted && elapsed < timeout)
+        {
+            yield return null; 
+            elapsed += Time.deltaTime; 
+        }
+
+        // 5초가 지나도 작업이 완료되지 않으면 타임아웃 처리
+        if (!loginTask.IsCompleted)
+        {
+            titleUI.ShowMessage(titleUI.errorMessage, "네트워크 상태가 불안정합니다. 다시 시도해주세요.", true);
+            yield break;  // 코루틴 종료 처리
+        }
         if (loginTask.Exception != null)
         {
             //로그인 실패 에러 처리
@@ -83,7 +98,7 @@ public class AuthManager : MonoBehaviour
         {
             var userRef = FirebaseDBManager.Instance.DbRef.Child("users")
                 .Child(FirebaseDBManager.Instance.User.UserId)
-                .Child("isLoggedIn").SetValueAsync(true);
+                .Child("isLoggedIn").SetValueAsync(false);
 
             yield return new WaitUntil(() => userRef.IsCompleted);
             if (userRef.Exception != null)
@@ -219,7 +234,21 @@ public class AuthManager : MonoBehaviour
             .OrderByChild("userNickName")
             .EqualTo(nickName).GetValueAsync();
 
-        yield return new WaitUntil(predicate: () => nickNameCheckingTask.IsCompleted);
+        float timeout = 5f;
+        float elapsed = 0f;
+
+        
+        while (!nickNameCheckingTask.IsCompleted && elapsed < timeout)
+        {
+            yield return null;
+            elapsed += Time.deltaTime;
+        }
+
+        if (!nickNameCheckingTask.IsCompleted)
+        {
+            titleUI.ShowMessage(titleUI.errorMessage, "네트워크 상태가 불안정합니다. 다시 시도해주세요.", true);
+            yield break;
+        }
         if (nickNameCheckingTask.Exception != null)
         {//닉네임 유효성 검사 실패 메세지: 사용할 수 없는 닉네임입니다.
             Debug.Log("중복닉네임검사 오류!");
@@ -258,7 +287,20 @@ public class AuthManager : MonoBehaviour
             .Child("userNickName")
             .SetValueAsync(nickName);
 
-        yield return new WaitUntil(predicate: () => nickNameTask.IsCompleted);
+        timeout = 5f;
+        elapsed = 0f;
+
+        while (!nickNameTask.IsCompleted && elapsed < timeout)
+        {
+            yield return null;
+            elapsed += Time.deltaTime;
+        }
+
+        if (!nickNameTask.IsCompleted)
+        {
+            titleUI.ShowMessage(titleUI.errorMessage, "네트워크 상태가 불안정합니다. 다시 시도해주세요.", true);
+            yield break;
+        }
         if (nickNameTask.Exception != null)
         {
             //파이어베이스 닉네임 저장 실패 메세지: 사용할 수 없는 닉네임입니다
@@ -291,14 +333,27 @@ public class AuthManager : MonoBehaviour
     /// <summary>
     /// 회원가입 코루틴
     /// 들어온 이메일과 패스워드를 파이어베이스 어스에 유저정보를 저장 함.
+    /// signUpTask를 Auth에 회원 정보를 요청하고, 요청동안 대기
+    /// 오류 또는 예기치 못한 상황에 대비하기 위해 while 조건에 타임아웃시간을 줘서 처리함
     /// </summary>
     /// <param name="email">이메일 필드로 받은 이메일 정보</param>
     /// <param name="password">패스워드 필드로 받은 패스워드 정보</param>
     IEnumerator SignUpCoroutine(string email, string password)
     {        
         var signUpTask = FirebaseDBManager.Instance.Auth.CreateUserWithEmailAndPasswordAsync(email, password);
-        yield return new WaitUntil(predicate: () => signUpTask.IsCompleted);
-        
+        float timeout = 5f;
+        float elapsed = 0f;
+                
+        while (!signUpTask.IsCompleted && elapsed < timeout)
+        {
+            yield return null;
+            elapsed += Time.deltaTime;
+        }                
+        if (!signUpTask.IsCompleted)
+        {
+            titleUI.ShowMessage(titleUI.errorMessage, "네트워크 상태가 불안정합니다. 다시 시도해주세요.", true);
+            yield break;
+        }
         if (signUpTask.Exception != null)
         {
             SignUpError(signUpTask.Exception);
@@ -410,5 +465,5 @@ public class AuthManager : MonoBehaviour
         titleUI.HideMessages(); //메세지 가리고
                                 //텍스트 초기화 하고        
         titleUI.LoginToButtonCon(); //회원가입 완료 후 로그인 화면으로 이동
-    }    
+    }
 }
