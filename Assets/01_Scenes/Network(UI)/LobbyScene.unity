@@ -2931,6 +2931,7 @@ MonoBehaviour:
   lobbyUiMgr: {fileID: 1383841038}
   kartCtrl: {fileID: 0}
   kartPrefab: {fileID: 6750277665416376479, guid: 3307d1a16d18ebb47a4bfe1b899abfb1, type: 3}
+  characterSo: {fileID: 0}
 --- !u!4 &583882397
 Transform:
   m_ObjectHideFlags: 0
@@ -7158,7 +7159,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 583882396}
         m_TargetAssemblyTypeName: LobbyManager, Assembly-CSharp
-        m_MethodName: RoomNumberJoin
+        m_MethodName: OnJoinRoomByNumberButtonClick
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}

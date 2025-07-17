@@ -21,7 +21,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
     {
         yield return new WaitUntil(() => PhotonNetwork.IsConnectedAndReady);
         PhotonNetwork.AutomaticallySyncScene = true;
-        RoomInfoUpdate();
+        //RoomInfoUpdate();
         CreatePlayerPanel();
         ProgressReSet();
         InitializeUI();
@@ -41,7 +41,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
             {
                 if(slot.actorNumber == newMasterClient.ActorNumber)
                 {
-                    roomUIManger.startBtn.onClick.RemoveListener(slot.playerPanel.StartBtnClickTrigger);
+                    roomUIManger.startBtn.onClick.RemoveListener(slot.playerPanel.ReadyBtnClickTrigger);
                     slot.playerPanel.readyImage.gameObject.SetActive(false);
                 }
             }
@@ -56,7 +56,6 @@ public class RoomManager : MonoBehaviourPunCallbacks
     /// </summary>
     private void InitializeUI()
     {
-
         if (PhotonNetwork.IsMasterClient)
         {
             roomUIManger.startBtnText.text = "게임 시작";
@@ -200,11 +199,11 @@ public class RoomManager : MonoBehaviourPunCallbacks
     /// 커스텀 프러퍼티를 활용하여 방의 변경된 정보를 업데이트한다.
     /// 변경된 정보는 커스텀 프러퍼티를 타고 저장되어 로비에 반영되도록 함
     /// </summary>
-    public void RoomInfoUpdate()
+    public void RoomInfoUpdate(Hashtable roomProperties)
     {
-        Hashtable roomProperties = PhotonNetwork.CurrentRoom.CustomProperties;
-        roomUIManger.roomNameText.text = roomProperties.ContainsKey("RoomName") ? (string)roomProperties["RoomName"] : "방 이름 없음";
-        roomUIManger.roomNumberText.text = roomProperties.ContainsKey("RoomNumber") ? (string)roomProperties["RoomNumber"] : "방 번호 없음";
+        roomProperties = PhotonNetwork.CurrentRoom.CustomProperties;
+        roomUIManger.roomNameText.text = roomProperties.ContainsKey("RoomName") ? (string)roomProperties["RoomName"] : "";
+        roomUIManger.roomNumberText.text = roomProperties.ContainsKey("RoomNumber") ? (string)roomProperties["RoomNumber"] : "";
         roomUIManger.roomMapNameText.text = roomProperties.ContainsKey("Map") ? (string)roomProperties["Map"]
         : "default"; ;
         var mapSprite = Resources.Load<Sprite>($"Maps/{roomUIManger.roomMapNameText.text}");
@@ -215,23 +214,14 @@ public class RoomManager : MonoBehaviourPunCallbacks
         roomUIManger.SetPasswordUI(hasPassword);
     }
     /// <summary>
-    /// 포톤네트워크에서 제공하는 방에서 프러퍼티의 변경을 콜백받는 메서드
-    /// 방에 변경된 내용을 뿌려준다.
+    /// 포톤 네트워크 방의 커스텀 프로퍼티가 변경될 때 호출되는 콜백
+    /// 변경된 프로퍼티만을 이용하여, 방 정보 UI 등을 업데이트한다.
     /// </summary>
     /// <param name="propertiesThatChanged">업데이트된 정보</param>
     public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
-    {        
-        RoomInfoUpdate(); //변경된 방 속성을 룸에 반영
-    }
-    /// <summary>
-    /// 포톤네트워크에서 제공하는 방에서 프러퍼티의 변경되었을 때 로비에서 그 정보를
-    /// 콜백받는 메서드
-    /// 방에 변경 된 내용을 로비에 뿌려준다.
-    /// </summary>
-    /// <param name="lobbyStatistics">로비가 많을 경우 또는 지정할 로비를 선택할 수 있음</param>
-    public override void OnLobbyStatisticsUpdate(List<TypedLobbyInfo> lobbyStatistics)
     {
-        RoomInfoUpdate();
+        // 변경된 방 속성을 룸에 반영
+        RoomInfoUpdate(propertiesThatChanged);
     }
 
     /// <summary>

@@ -4,6 +4,7 @@ using UnityEngine;
 using Firebase;
 using Firebase.Auth;
 using Firebase.Database;
+using UnityEngine.Rendering;
 
 public class FirebaseDBManager : MonoBehaviour
 {
@@ -33,6 +34,10 @@ public class FirebaseDBManager : MonoBehaviour
 
     public void OnApplicationQuit()
     {
+        if(!string.IsNullOrEmpty("isLoggedIn"))
+        {
+            return;
+        }
         //로그아웃 감지되면 파이어베이스 로그인 상태 false로 변환
         DbRef.Child("users").Child(FirebaseDBManager.Instance.User.UserId)
             .Child("isLoggedIn").SetValueAsync(false);

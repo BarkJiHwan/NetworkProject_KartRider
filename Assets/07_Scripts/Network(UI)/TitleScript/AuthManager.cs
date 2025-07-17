@@ -6,7 +6,6 @@ using Firebase.Auth;
 using Firebase.Database;
 using System;
 using System.Linq;
-using UnityEditor.VersionControl;
 
 public class AuthManager : MonoBehaviour
 {
@@ -38,7 +37,6 @@ public class AuthManager : MonoBehaviour
     /// </summary>
     public void Login()
     {
-
         string email = titleUI.loginEmailField.text;
         string password = titleUI.loginpasswordField.text;
         titleUI.SetLogInButtonsInteractable(false);
@@ -48,30 +46,33 @@ public class AuthManager : MonoBehaviour
     {
         // Firebase 인증을 통해 이메일과 비밀번호 로그인 요청 처리
         var loginTask = FirebaseDBManager.Instance.Auth.SignInWithEmailAndPasswordAsync(email, password);
-
         float timeout = 5f; // 타임아웃 시간
-        float elapsed = 0f; 
+        float elapsedTime = 0f; 
         string message = ""; // 출력 메세지
         bool toggle = true; // 출력 메세지 변환을 위한 토글
-        while (!loginTask.IsCompleted && elapsed < timeout)
+        while (!loginTask.IsCompleted && elapsedTime <= timeout)
         {
             message = toggle ? "로그인중." : "로그인중..";
             titleUI.ShowMessage(titleUI.successMessage, message, true);
             toggle = !toggle;
             yield return wait;
-            elapsed += 1f;
+            elapsedTime += 1f;
         }
         // 5초가 지나도 작업이 완료되지 않으면 타임아웃 처리
         if (!loginTask.IsCompleted)
         {
             titleUI.ShowMessage(titleUI.errorMessage, "네트워크 상태가 불안정합니다. 다시 시도해주세요.", true);
+            yield return wait;
+            titleUI.HideMessages();
             yield break;  // 코루틴 종료 처리
         }
         if (loginTask.Exception != null)
         {
             //로그인 실패 에러 처리
+            titleUI.HideMessages();
             LoginError(loginTask.Exception);
             titleUI.SetLogInButtonsInteractable(true);
+            yield return wait;
             yield break;
         }
 
@@ -110,6 +111,38 @@ public class AuthManager : MonoBehaviour
                 yield return new WaitForSeconds(1f);
                 titleUI.SetLogInButtonsInteractable(true);
                 yield break;
+            }
+
+            var characterTask = FirebaseDBManager.Instance.DbRef.Child("users")
+                    .Child(FirebaseDBManager.Instance.User.UserId)
+                    .Child("CharacterList")
+                    .GetValueAsync();
+            yield return new WaitUntil(() => characterTask.IsCompleted);
+            if (characterTask.Exception != null)
+            {
+                titleUI.ShowMessage(titleUI.errorMessage, "네트워크 상태가 불안정합니다. 다시 시도해주세요.", true);
+                yield return wait;
+                titleUI.HideMessages();
+                yield break;  // 코루틴 종료 처리
+            }
+            if (string.IsNullOrEmpty("CharacterList"))
+            {
+                //리소스폴더에 있는 캐릭터들의 이름을 파이어베이스의 데이터 베이스에 저장함
+                List<CharacterSo> characters = Resources.LoadAll<CharacterSo>("Character").ToList();
+                List<string> jsonList = characters.Select(p => p.characterName).ToList();
+
+                var saveTask = FirebaseDBManager.Instance.DbRef.Child("users")
+                    .Child(FirebaseDBManager.Instance.User.UserId)
+                    .Child("CharacterList")
+                    .SetValueAsync(jsonList);
+                yield return new WaitUntil(() => saveTask.IsCompleted);
+                if (!saveTask.IsCompleted)
+                {
+                    titleUI.ShowMessage(titleUI.errorMessage, "초기 캐릭터 리스트 저장 실패!관리자에게 문의하세요.", true);
+                    yield return new WaitForSeconds(2);
+                    yield break;
+                }
+                Debug.Log("초기 캐릭터 셋팅 완료");
             }
             // 로그인 성공 처리
             LoginSuccess(loginTask.Result.User);
@@ -153,26 +186,6 @@ public class AuthManager : MonoBehaviour
             titleUI.ToggleCreateNickNamePanel(true);
         }
         yield return new WaitUntil(predicate: () => !string.IsNullOrEmpty(user.DisplayName));
-
-        if (string.IsNullOrEmpty("CharacterList"))
-        {
-            //리소스폴더에 있는 캐릭터들의 이름을 파이어베이스의 데이터 베이스에 저장함
-            List<CharacterSo> characters = Resources.LoadAll<CharacterSo>("Character").ToList();
-            List<string> jsonList = characters.Select(p => p.characterName).ToList();
-
-            var saveTask = FirebaseDBManager.Instance.DbRef.Child("users")
-                .Child(FirebaseDBManager.Instance.User.UserId)
-                .Child("CharacterList")
-                .SetValueAsync(jsonList);
-            yield return new WaitUntil(() => saveTask.IsCompleted);
-            if (!saveTask.IsCompleted)
-            {
-                titleUI.ShowMessage(titleUI.errorMessage, "초기 캐릭터 리스트 저장 실패!관리자에게 문의하세요.", true);
-                yield return new WaitForSeconds(2);
-                yield break;
-            }
-            Debug.Log("초기 캐릭터 셋팅 완료");
-        }
 
         titleUI.ToggleCreateNickNamePanel(false);//닉네임이 있다면 통과
         titleUI.ShowMessage(titleUI.successMessage, "로그인 성공!", true);
@@ -238,16 +251,16 @@ public class AuthManager : MonoBehaviour
             .EqualTo(nickName).GetValueAsync();
 
         float timeout = 5f;
-        float elapsed = 0f;
+        float elapsedTime = 0f;
         string message = "";
         bool toggle = true;
-        while (!nickNameCheckingTask.IsCompleted && elapsed < timeout)
+        while (!nickNameCheckingTask.IsCompleted && elapsedTime <= timeout)
         {
             message = toggle ? "닉네임 생성중." : "닉네임 생성중..";
             titleUI.ShowMessage(titleUI.successMessage, message, true);
             toggle = !toggle;
             yield return wait;
-            elapsed += 1f;
+            elapsedTime += 1f;
         }
         if (!nickNameCheckingTask.IsCompleted)
         {
@@ -292,14 +305,14 @@ public class AuthManager : MonoBehaviour
             .SetValueAsync(nickName);
 
         timeout = 5f;
-        elapsed = 0f;
-        while (!nickNameTask.IsCompleted && elapsed < timeout)
+        elapsedTime = 0f;
+        while (!nickNameTask.IsCompleted && elapsedTime <= timeout)
         {
             message = toggle ? "닉네임 생성중." : "닉네임 생성중..";
             titleUI.ShowMessage(titleUI.successMessage, message, true);
             toggle = !toggle;
             yield return wait;
-            elapsed += 1f;
+            elapsedTime += 1f;
         }
         if (!nickNameTask.IsCompleted)
         {
@@ -346,21 +359,23 @@ public class AuthManager : MonoBehaviour
         titleUI.SetsignUpInteractable(false);// 버튼 비활성
         var signUpTask = FirebaseDBManager.Instance.Auth.CreateUserWithEmailAndPasswordAsync(email, password);
         float timeout = 5f;
-        float elapsed = 0f;
+        float elapsedTime = 0f;
         bool toggle = true;
         string message = "";
-        while (!signUpTask.IsCompleted && elapsed < timeout)
+        while (!signUpTask.IsCompleted && elapsedTime <= timeout)
         {
-            message = toggle ? "계정 확인중." : "계정 확인중..";
+            message = toggle ? "계정 생성중." : "계정 생성중..";
             titleUI.ShowMessage(titleUI.successMessage, message, true);
             toggle = !toggle;
-            yield return wait;
-            elapsed += 1f;
+            yield return wait; // 1초 대기를 위해 변수로 미리 생성
+            elapsedTime += 1f;
         }
         if (!signUpTask.IsCompleted)
         {
-            titleUI.SetsignUpInteractable(true);
             titleUI.ShowMessage(titleUI.errorMessage, "네트워크 상태가 불안정합니다. 다시 시도해주세요.", true);
+            yield return wait;
+            titleUI.SetsignUpInteractable(true);
+            titleUI.HideMessages();
             yield break;
         }
         if (signUpTask.Exception != null)
@@ -378,6 +393,7 @@ public class AuthManager : MonoBehaviour
     /// </summary>
     private void SignUpError(AggregateException exception)
     {
+        titleUI.HideMessages();
         FirebaseException firebaseEx = exception.GetBaseException() as FirebaseException;
         AuthError errorCode = (AuthError)firebaseEx.ErrorCode;
 
@@ -428,16 +444,16 @@ public class AuthManager : MonoBehaviour
             .Child(FirebaseDBManager.Instance.User.UserId).Child("isLoggedIn")
             .SetValueAsync(false);
         float timeout = 2f;
-        float elapsed = 0f;
+        float elapsedTime = 0f;
         bool toggle = true;
         string message = "";
-        while (elapsed < timeout)
+        while (elapsedTime <= timeout)
         {
             message = toggle ? "계정 생성중." : "계정 생성중..";
             titleUI.ShowMessage(titleUI.successMessage, message, true);
             toggle = !toggle;
-            yield return wait;
-            elapsed += 1f;
+            yield return wait; 
+            elapsedTime += 1f;
         }
         if (!setPrfileTask.IsCompleted)
         {
@@ -462,16 +478,16 @@ public class AuthManager : MonoBehaviour
             .Child("CharacterList")
             .SetValueAsync(jsonList);
         timeout = 5f;
-        elapsed = 0f;
+        elapsedTime = 0f;
         toggle = true;
         message = "";
-        while (!setPrfileTask.IsCompleted && elapsed < timeout)
+        while (!setPrfileTask.IsCompleted && elapsedTime <= timeout)
         {
             message = toggle ? "캐릭터 정보 생성중." : "캐릭터 정보 생성중...";
             titleUI.ShowMessage(titleUI.successMessage, message, true);
             toggle = !toggle;
             yield return wait;
-            elapsed += 1f;
+            elapsedTime += 1f;
         }
         if (!saveTask.IsCompleted)
         {

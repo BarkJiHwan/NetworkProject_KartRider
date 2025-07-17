@@ -5,9 +5,6 @@ using UnityEngine.UI;
 using TMPro;
 using Photon.Pun;
 using Photon.Realtime;
-using System.Linq;
-using UnityEngine.ProBuilder.Shapes;
-using UnityEngine.TextCore.Text;
 
 /// <summary>
 /// 플레이어 오브젝트 스크립트
@@ -22,6 +19,7 @@ public class PlayerPanel : MonoBehaviourPun
     [Header("준비 완료 이미지")]
     public Image readyImage;
 
+    private bool _playerIsready;
     [SerializeField] private RoomManager roomManager;
     [SerializeField] private CharacterList characterList;
     private void Start()
@@ -30,8 +28,9 @@ public class PlayerPanel : MonoBehaviourPun
         characterList = GameObject.FindObjectOfType<CharacterList>();
         if (photonView.IsMine)
         {
+            _playerIsready = false;
             //이후에 들어온 사람도 확인을 해야하기 때문에 RpcTarget.AllBuffered사용
-            GetComponent<PhotonView>().RPC("SetOwnInfo", RpcTarget.AllBuffered, PhotonNetwork.LocalPlayer);
+            GetComponent<PhotonView>().RPC("SetOwnInfo", RpcTarget.AllBuffered, PhotonNetwork.LocalPlayer, _playerIsready);
             OnClickGameObjSelectBtn();
         }
     }
@@ -44,7 +43,7 @@ public class PlayerPanel : MonoBehaviourPun
     /// 저장이 완료 되면 위치 값과 크기를 조정함
     /// </summary>
     [PunRPC]
-    public void SetOwnInfo(Player player)
+    public void SetOwnInfo(Player player, bool isReady)
     {
         if (roomManager == null)
         {
@@ -57,8 +56,8 @@ public class PlayerPanel : MonoBehaviourPun
             {
                 roomManager.playerSlots[i].playerPanel = GetComponent<PlayerPanel>();
                 roomManager.playerSlots[i].actorNumber = player.ActorNumber;
-                roomManager.roomUIManger.startBtn.onClick.AddListener(roomManager.playerSlots[i].playerPanel.StartBtnClickTrigger);
-                roomManager.playerSlots[i].isReady = false;
+                roomManager.roomUIManger.startBtn.onClick.AddListener(roomManager.playerSlots[i].playerPanel.ReadyBtnClickTrigger);
+                roomManager.playerSlots[i].isReady = isReady;
                 roomManager.roomUIManger.characterSelectBtn.onClick.AddListener(roomManager.playerSlots[i].playerPanel.OnClickGameObjSelectBtn);
                 transform.SetParent(roomManager.playerSlots[i].transform);
                 roomManager.UpdateAllPlayersReady();
@@ -70,16 +69,20 @@ public class PlayerPanel : MonoBehaviourPun
         GetComponent<RectTransform>().localPosition = Vector3.zero;
     }
     /// <summary>
-    /// 스타트 버튼
+    /// 준비 버튼
     /// 마스터 클라이언트가 아닐경우에만 활성화 
     /// 마스터는 따로 룸매니저에서 할당 됨
     /// </summary>
-    public void StartBtnClickTrigger()
+    public void ReadyBtnClickTrigger()
     {
         if (photonView.IsMine && !PhotonNetwork.IsMasterClient)
         {
+            _playerIsready = !readyImage.gameObject.activeSelf;
             //이후에 들어온 사람도 확인을 해야하기 때문에 RpcTarget.AllBuffered사용
-            GetComponent<PhotonView>().RPC("SetReady", RpcTarget.AllBuffered);
+            GetComponent<PhotonView>().RPC
+                ("SetReady", 
+                RpcTarget.AllBuffered, 
+                _playerIsready);
         }
     }
     /// <summary>
@@ -88,7 +91,7 @@ public class PlayerPanel : MonoBehaviourPun
     /// 자신의 위치의 자신의 것만 확인하고 모두에게 정보를 알려줘야함.
     /// </summary>
     [PunRPC]
-    public void SetReady()
+    public void SetReady(bool playerIsReady)
     {
         //부모객체에서 찾기
         Transform parentTransform = transform.parent;
@@ -100,20 +103,12 @@ public class PlayerPanel : MonoBehaviourPun
         {
             //부모의 컴포넌트 가져오기
             PlayerSlot parentSlot = parentTransform.GetComponent<PlayerSlot>();
+
             if (parentSlot != null)
             {
-                if (!readyImage.gameObject.activeSelf)
-                {
-                    parentSlot.isReady = true;
-                    readyImage.gameObject.SetActive(true);
-                    roomManager.UpdateAllPlayersReady();
-                }
-                else
-                {
-                    parentSlot.isReady = false;
-                    roomManager.UpdateAllPlayersReady();
-                    readyImage.gameObject.SetActive(false);
-                }
+                parentSlot.isReady = playerIsReady;
+                readyImage.gameObject.SetActive(playerIsReady);
+                roomManager.UpdateAllPlayersReady();
             }
         }
     }

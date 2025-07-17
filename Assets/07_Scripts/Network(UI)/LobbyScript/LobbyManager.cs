@@ -4,6 +4,8 @@ using System.Collections;
 using UnityEngine;
 using Photon.Pun;
 using Photon.Realtime;
+using Firebase.Database;
+using System.Linq;
 
 
 public class LobbyManager : MonoBehaviourPunCallbacks
@@ -11,15 +13,15 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     [SerializeField]private LobbyUIManager lobbyUiMgr;
     private List<RoomInfo> roomInfos = new List<RoomInfo>();
     private Dictionary<string, RoomEntry> roomEntryMap = new Dictionary<string, RoomEntry>();
-    private Queue<string> availableRoomNumbers = new Queue<string>(); // 방 번호 관리 Queue
-    private HashSet<string> usedRoomNumbers = new HashSet<string>(); // 사용 중인 방 번호 추적
+    private Queue<int> availableRoomNumbers = new Queue<int>(); // 방 번호 관리 Queue
+    private HashSet<int> usedRoomNumbers = new HashSet<int>(); // 사용 중인 방 번호 추적
     private Coroutine roomListUpdateCor;
     [HideInInspector] public TestCHMKart kartCtrl;
     public GameObject kartPrefab;
     private CharacterSo[] _characterSoArray;
     public CharacterSo characterSo;
     private void Awake()
-    {        
+    {
         _characterSoArray = Resources.LoadAll<CharacterSo>("Character");
 
         DefaultPool pool = PhotonNetwork.PrefabPool as DefaultPool;
@@ -62,12 +64,13 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     /// </summary>
     private void InitializeRoomNumber()
     {
-        HashSet<string> uniqueNumbers = new HashSet<string>();
+        HashSet<int> uniqueNumbers = new HashSet<int>();
 
         while (uniqueNumbers.Count < 100) // 100개의 고유한 방 번호 생성
         {
-            string roomNumber = Random.Range(100000, 999999).ToString();
+            int roomNumber = Random.Range(100000, 999999);
             uniqueNumbers.Add(roomNumber);
+            Debug.Log(roomNumber);
         }
 
         foreach (var number in uniqueNumbers)
@@ -79,17 +82,17 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     /// 만약 번호가 사용중이라면 방 생성 전에 오류를 띄워줌
     /// </summary>
     /// <returns></returns>
-    private string GetRoomNumber()
+    private int GetRoomNumber()
     {
         if (availableRoomNumbers.Count > 0)
         {
-            string roomNumber = availableRoomNumbers.Dequeue();
+            int roomNumber = availableRoomNumbers.Dequeue();
             usedRoomNumbers.Add(roomNumber); //사용 중인 번호에 추가
             return roomNumber;
         }
         //큐에 남아있는 방 번호가 없을 경우, UI로 오류 메시지 표시
         lobbyUiMgr.RoomJoinFaildeText("방을 만들 수 없습니다.");
-        return null; //오류 상황을 처리할 수 있도록 null 반환
+        return -1; //오류 상황을 처리할 수 있도록 -1 반환
     }
 
     /// <summary>
@@ -113,9 +116,9 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         lobbyUiMgr.ClickOffPanelActive(true);
         string roomName = lobbyUiMgr.roomNameInputField.text;
         string password = string.IsNullOrEmpty(lobbyUiMgr.roomPasswordInputField.text) ? null : lobbyUiMgr.roomPasswordInputField.text;
-        string roomNumber = GetRoomNumber();
+        int roomNumber = GetRoomNumber();
 
-        if (string.IsNullOrEmpty(roomNumber))
+        if (roomNumber <= 0)
             return;
 
         CreateRoom(roomName, password, roomNumber); //포톤에서 지원하는 메서드가 아닌 만든 매서드
@@ -151,13 +154,14 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     /// <param name="roomName"></param>
     /// <param name="password"></param>
     /// <param name="roomNumber"></param>
-    public void CreateRoom(string roomName, string password, string roomNumber)
-    {       
+    public void CreateRoom(string roomName, string password, int roomNumber)
+    {
+        string roomNum = roomNumber.ToString();
         Hashtable custom = new Hashtable
         {
             { "RoomName", roomName },
             { "Password", password },
-            { "RoomNumber", roomNumber },
+            { "RoomNumber", roomNum },
             { "Map", "default"},
             { "IsGameStart", false }
         };
@@ -170,14 +174,14 @@ public class LobbyManager : MonoBehaviourPunCallbacks
             CustomRoomPropertiesForLobby = new string[] { "RoomName", "Password", "RoomNumber","Map","IsGameStart" }
         };
 
-        PhotonNetwork.CreateRoom(roomNumber, roomOptions, TypedLobby.Default); //로비는 한 개밖에 없으니 로비타입은 기본
+        PhotonNetwork.CreateRoom(roomNum, roomOptions, TypedLobby.Default); //로비는 한 개밖에 없으니 로비타입은 기본
     }
 
     /// <summary>
     /// 빠른 입장 클릭 시 실행
     /// 방에 들어가지 못했다면 랜덤한 방을 만들도록 설정함
-    /// CreateRoom과 다르게 랜덤으로 생성한 방은 비밀번호 설정을 하지 않음 대신 룸에 들어가서 설정을 통해 변경이 가능하도록 설정할 것임
-    /// 입장에 실패 했을 때 내가 방을 만들면 유저입장에서 오류라고 인식하지 못할 것이기 때문에 OnJoinRandomFailed 포톤에서 제공되는 메서드에서 적용
+    /// CreateRoom과 다르게 랜덤으로 생성한 방은 비밀번호 설정을 하지 않음     
+    /// 입장 실패시 또는 방이 없다면 내가 방을 만듬
     /// </summary>
     /// <param name="returnCode"> 룸 입장 실패에 따른 에러코드 : 따로 정의하지 않음 </param>
     /// <param name="message"> 룸 입장 실패 관련 메세지 : 따로 정의하지 않음 </param>
@@ -185,15 +189,16 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     {
         //랜덤 조인 시도 시 방이 없다면 방을 생성하기 위한 메서드
         //방제는 저기중 하나가 나옴 추가설정 가능
-        string[] roomNames = { "다함께 카트라이더", "메타플밍9기 모여라", "방 제목을 할게 없네요" };
+        string[] roomNames = { "다함께 카트라이더", "1:1 매너전", "방 제목을 할게 없네요" };
         int randomName = Random.Range(0, roomNames.Length);
         string randomRoomName = roomNames[randomName];
-        string roomNumber = GetRoomNumber();
+        int roomNumber = GetRoomNumber();
+        string roomNum = roomNumber.ToString();
         Hashtable custom = new Hashtable
         {
             { "RoomName", randomRoomName },
             { "Password", "" },
-            { "RoomNumber", roomNumber },
+            { "RoomNumber", roomNum },
             { "Map", "default"},
             { "IsGameStart", false }
         };
@@ -206,7 +211,7 @@ public class LobbyManager : MonoBehaviourPunCallbacks
             CustomRoomPropertiesForLobby = new string[] { "RoomName", "Password", "RoomNumber", "Map", "IsGameStart" }
         };
 
-        PhotonNetwork.JoinRandomOrCreateRoom(custom, 8, MatchmakingMode.FillRoom, null, null, roomNumber, roomOptions, null);
+        PhotonNetwork.JoinRandomOrCreateRoom(custom, 8, MatchmakingMode.FillRoom, null, null, roomNum, roomOptions, null);
     }
 
     /// <summary>
@@ -250,11 +255,15 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     IEnumerator KartandCharacterCor()
     {
         GameObject kart = Instantiate(kartPrefab, Vector3.zero, Quaternion.Euler(0, 140, 0));
-
-        if (!string.IsNullOrEmpty("SelectedCharacter"))
+        string characterName = "";
+        var characterTask = FirebaseDBManager.Instance.DbRef.Child("users")
+            .Child(FirebaseDBManager.Instance.User.UserId)
+            .Child("SelectedCharacter").GetValueAsync();
+        yield return new WaitUntil(() => characterTask.IsCompleted);        
+        if (string.IsNullOrEmpty("SelectedCharacter"))
         {            
-            string characterName = "Bazzi";
-            var characterTask = FirebaseDBManager.Instance.DbRef.Child("users")
+            characterName = "Bazzi";
+            var characTask = FirebaseDBManager.Instance.DbRef.Child("users")
             .Child(FirebaseDBManager.Instance.User.UserId)
             .Child("SelectedCharacter")
             .SetValueAsync(characterName);
@@ -277,7 +286,24 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         }
         else
         {
-            characterSo = _characterSoArray[1];
+            var charactTask = FirebaseDBManager.Instance.DbRef.Child("users")
+            .Child(FirebaseDBManager.Instance.User.UserId)
+            .Child("SelectedCharacter").GetValueAsync();
+
+            yield return new WaitUntil(() => characterTask.IsCompleted);
+            DataSnapshot snapshot = characterTask.Result;
+            if (snapshot.Exists && snapshot.Value != null)
+            {
+                characterName = snapshot.Value.ToString();
+            }
+            foreach (var character in _characterSoArray)
+            {
+                if (characterName == character.characterName)
+                {
+                    characterSo = character;
+                    break;
+                }
+            }
         }
         if (characterSo.characterName == "Airi" || characterSo.characterName == "Lena")
         {
@@ -288,14 +314,6 @@ public class LobbyManager : MonoBehaviourPunCallbacks
             GameObject playerChar = Instantiate(characterSo.characterPrefab, Vector3.zero, Quaternion.Euler(0, -30, 0));
         }
     }
-    /// <summary>
-    /// 로비에서 나갈 때 룸리스트 업데이트 코루틴 멈추기
-    /// 룸 이동시 어차피 씬 전환으로 인해 파괴가 될 것이지만.... 흠
-    /// </summary>
-    public override void OnLeftLobby()
-    {
-        StopAllCoroutines();
-    }
 
     /// <summary>
     /// 로비에서 보이는 룸을 업데이트 함
@@ -304,10 +322,36 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     /// <param name="roomList"></param>
     public override void OnRoomListUpdate(List<RoomInfo> roomList)
     {
-        //RoomListUpdate(roomList); //변화가 감지되면 자동으로 업데이트(최적화 문제로 빼겠습니다.)
-        roomInfos = roomList; //룸에 변화가 감지되면 roomInfos에 새로 업데이트
+        //RoomListUpdate(roomList); //변화가 감지되면 자동으로 업데이트
+        roomInfos.Clear();
+        roomInfos = roomList.ToList(); // 리스트의 복사본을 내 리스트에 담아둠
     }
-
+    public void OnJoinRoomByNumberButtonClick()
+    {
+        if (int.TryParse(lobbyUiMgr.roomNumberInputField.text, out int inputRoomNumber))
+        {
+            JoinRoomByNumber(inputRoomNumber, roomInfos);
+        }
+        else
+        {
+            lobbyUiMgr.RoomJoinFaildeText("유효한 숫자를 입력하세요.");
+        }
+    }
+    public void JoinRoomByNumber(int inputRoomNumber, List<RoomInfo> roomInfos)
+    {
+        foreach (var room in roomInfos)
+        {
+            string roomNumber = room.CustomProperties.ContainsKey("RoomNumber")
+            ? (string)room.CustomProperties["RoomNumber"].ToString() : "해당 방이 존재하지 않습니다.";
+            if (roomNumber == inputRoomNumber.ToString())
+            {
+                PhotonNetwork.JoinRoom(room.Name); // 실제 룸 이름(ID)
+                return;
+            }
+        }
+        // 없을 때
+        lobbyUiMgr.RoomJoinFaildeText("해당 방이 존재하지 않습니다.");
+    }
     /// <summary>
     /// 리셋 버튼을 누르면 유저 임의로 로비Room 업데이트
     /// </summary>
@@ -317,13 +361,11 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     }
 
     /// <summary>
-    ///15초 마다 룸 리스트 자동으로 업데이트 되도록 설계함
-    ///시간은 바꿔도 됩니다.
+    /// 로비에서 나갈 때 룸리스트 업데이트 코루틴 멈추기
     /// </summary>
-    /// <example waitForSec = new WaitForSeconds(s);> s에 원하는 시간초 넣으면 됨 </example>
     IEnumerator RoomListUpdateCor()
     {
-        WaitForSeconds waitForSec = new WaitForSeconds(1f);
+        WaitForSeconds waitForSec = new WaitForSeconds(10f);
 
         while (PhotonNetwork.InLobby)
         {
@@ -332,6 +374,15 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         }
     }
 
+    public override void OnLeftLobby()
+    {
+        StopAllCoroutines();
+    }
+    /// <summary>
+    ///15초 마다 룸 리스트 자동으로 업데이트 되도록 설계함
+    ///시간은 바꿔도 됩니다.
+    /// </summary>
+    /// <example waitForSec = new WaitForSeconds(s);> s에 원하는 시간초 넣으면 됨 </example>
     /// <summary>
     /// 포톤에서 OnRoomListUpdate가 호출 되면 전체적인 룸 리스트 업데이트를 진행함
     /// 방이 새로 생성 되거나 없어지거나 상태가 변화되면 자동으로 실행 되도록 만듬
@@ -347,9 +398,10 @@ public class LobbyManager : MonoBehaviourPunCallbacks
             }
             else
             {
+                Debug.Log(roomInfo.Name);
                 if (!roomEntryMap.ContainsKey(roomInfo.Name)) //새로운 방 추가
                 {
-                    AddRoomToList(roomInfo);
+                    CreateRoomButton(roomInfo);
                 }
                 else
                 {
@@ -360,7 +412,7 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     }
     /// <summary>
     /// 방 오브젝트를 삭제를 담당하는 메서드
-    /// 삭제가 완료 되면 리스트와 딕셔너리에서 제거함
+    /// 삭제가 완료 되면 딕셔너리에서 제거함
     /// </summary>
     private void RemoveRoomEntry(string roomName)
     {
@@ -371,7 +423,7 @@ public class LobbyManager : MonoBehaviourPunCallbacks
             // UI 오브젝트 삭제
             Destroy(entryToRemove.gameObject);
 
-            // 리스트와 매핑에서 제거
+            // 제거
             roomEntryMap.Remove(roomName);
         }
     }
@@ -394,11 +446,11 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     /// 방에 무언가 속성값이 있다면?(게임이 시작 되었거나, 비밀번호가 있거나 등... 옵션 추가가능 RoomEntry 스크립트에서 할 것)
     /// </summary>
     /// <param name="roomInfo">포톤의 룸인포를 받아서 처리함 </param>
-    public void AddRoomToList(RoomInfo roomInfo)
+    public void CreateRoomButton(RoomInfo roomInfo)
     {
         var roomEntry = Instantiate(lobbyUiMgr.roomPrefab, lobbyUiMgr.roomListPanel.transform); //룸 오브젝트 생성
         var roomEntryScript = roomEntry.GetComponent<RoomEntry>(); //생성된 룸에 RoomEntry 스크립트 컴포넌트 담기
-        roomEntryMap.Add(roomInfo.Name, roomEntryScript);//방정보와 진짜오브젝트와 맵핑(딕셔너리만 있어도 되긴함)
+        roomEntryMap.Add(roomInfo.Name, roomEntryScript);//방정보와 진짜오브젝트와 맵핑
         
         if (roomEntryScript != null)
         {
@@ -415,18 +467,18 @@ public class LobbyManager : MonoBehaviourPunCallbacks
                 }
                 else if (roomEntryScript.IsGameStarted(roomInfo))
                 {
-                    RoomListUpdate(roomInfos);
                     lobbyUiMgr.RoomJoinFaildeText("게임이 이미 진행 중입니다.");
+                    RoomListUpdate(roomInfos);
                 }
                 else if (roomEntryScript.IsRoomFull(roomInfo))
                 {
-                    RoomListUpdate(roomInfos);
                     lobbyUiMgr.RoomJoinFaildeText("방이 가득 찼습니다.");
-                }
-                else if (roomInfo == null)
-                {
                     RoomListUpdate(roomInfos);
+                }
+                else if (!roomEntryMap.ContainsKey(roomInfo.Name))
+                {
                     lobbyUiMgr.RoomJoinFaildeText("방이 없습니다.");
+                    RoomListUpdate(roomInfos);
                 }
                 else
                 {

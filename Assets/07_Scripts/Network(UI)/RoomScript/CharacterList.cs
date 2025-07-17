@@ -1,3 +1,4 @@
+using Firebase.Database;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -66,28 +67,24 @@ public class CharacterList : MonoBehaviour
     }
     IEnumerator KartandCharacterCor()
     {
-        if (!string.IsNullOrEmpty("SelectedCharacter"))
-        {
-            var characterTask = FirebaseDBManager.Instance.DbRef.Child("users")
+        var characterTask = FirebaseDBManager.Instance.DbRef.Child("users")
             .Child(FirebaseDBManager.Instance.User.UserId)
-            .Child("SelectedCharacter")
-            .GetValueAsync();
-            yield return new WaitUntil(() => characterTask.IsCompleted);
-            if (characterTask.Exception != null)
-            {
-                Index = 1;
-                characterName = "Bazzi";
-            }
-            else
-            {
-                characterName = characterTask.Result.Value.ToString();
-                GetPlayerSelectedCharacter();
-            }
-        }
-        else
+            .Child("SelectedCharacter").GetValueAsync();
+
+        yield return new WaitUntil(() => characterTask.IsCompleted);
+        DataSnapshot snapshot = characterTask.Result;
+        if (snapshot.Exists && snapshot.Value != null)
         {
-            Index = 1;
-            characterListPrefab[Index].gameObject.SetActive(true);
+            characterName = snapshot.Value.ToString();
+        }
+        foreach (var character in characters)
+        {
+            if (characterName == character.characterName)
+            {
+                characterListPrefab[Index].gameObject.SetActive(true);
+                break;
+            }
+            Index++;
         }
     }
     private void GetPlayerSelectedCharacter()

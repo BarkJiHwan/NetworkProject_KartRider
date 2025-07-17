@@ -6,15 +6,16 @@ using UnityEngine.UI;
 
 public class RoomEntry : MonoBehaviour
 {
-    public TMP_Text roomNumberText;
-    public TMP_Text roomNameText;
+    [Header("룸 엔트리 속성들")]
+    [SerializeField] private TMP_Text roomNumberText;
+    [SerializeField] private TMP_Text roomNameText;
     public TMP_Text roomPasswordText;
-    public TMP_Text playerCountText;
-    public TMP_Text MaxPlayersText;
-    public TMP_Text mapNameText;
-    public Image mapImage;
-    public Image lockIcon;
-    public GameObject roomNamePanel;
+    [SerializeField] private TMP_Text playerCountText;
+    [SerializeField] private TMP_Text MaxPlayersText;
+    [SerializeField] private TMP_Text mapNameText;
+    [SerializeField] private Image mapImage;
+    [SerializeField] private Image lockIcon;
+    [SerializeField] private GameObject roomNamePanel;
 
     /// <summary>
     /// 방 정보를 로비화면에서 셋팅하기 위한 RoomEntry 
@@ -23,15 +24,14 @@ public class RoomEntry : MonoBehaviour
     /// <param name="roomInfo">포톤에서 제공해 주는 룸인포 정보를 받아옴</param>
     public void SetRoomInfo(RoomInfo roomInfo)
     {
-        //방 이름 받아서 처리, 방 이름 디폴트 값 방이름?
+        //방 이름 받아서 처리
         roomNameText.text = roomInfo.CustomProperties.ContainsKey("RoomName")
             ? (string)roomInfo.CustomProperties["RoomName"]
-            : "방이름 전체 오류 없으면 빈칸이 떠야함";
+            : "";
         //중복되지 않는 방의 고유 숫자 이걸로 조인가능
         roomNumberText.text = roomInfo.CustomProperties.ContainsKey("RoomNumber")
             ? (string)roomInfo.CustomProperties["RoomNumber"].ToString()
-            : "방 고유 숫자를 못받음 로비메니저 숫자 설정하는 Queue확인";
-
+            : "-1";
         //방에 입장한 인원 수
         playerCountText.text = $"{roomInfo.PlayerCount}";
         //방에 최대 입장 가능한 인원 수
@@ -75,7 +75,6 @@ public class RoomEntry : MonoBehaviour
         return roomInfo.CustomProperties.ContainsKey("Password") &&
             !string.IsNullOrEmpty(roomInfo.CustomProperties["Password"] as string); //비밀번호 확인
     }
-   
     //룸에 패스워드가 있다면 패스워드 아이콘을 띄움
     public void SetLockIcon(bool isPassword)
     {
